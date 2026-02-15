@@ -13,6 +13,8 @@ html,body{
   overflow:hidden;
 }
 
+button { touch-action: manipulation; }
+
 /* 正方形ステージ */
 #stage{
   position:relative;
@@ -252,3 +254,4 @@ html,body{
 
 /* hidden */
 .hidden{ display:none !important; }
+
