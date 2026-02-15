@@ -198,7 +198,7 @@
     images.bg1_4 = await loadImage(IMG.bg1_4);
   }
 
-  // ===== Boot gating（★スタート確実化）=====
+  // ===== Boot gating（スタート確実化）=====
   let assetsReady = false;
 
   function showLoading() {
@@ -210,10 +210,7 @@
     elPanelText.classList.remove("countdownBig");
     elPanelText.textContent = "読み込み中だよ…";
     elPanelHint.textContent = "画像の読み込みが終わったらStartできるよ";
-
     btnExitPanel.style.visibility = "hidden";
-    btnStart.textContent = "Start";
-    btnShare.textContent = "Share";
   }
 
   // ===== State =====
@@ -273,14 +270,13 @@
     return (performance.now() - startMs) / 1000;
   }
 
-  // ===== BG thresholds（★指定に調整）=====
-  // bg1_1: 0-299 / bg1_2: 300-1499 / bg1_3: 1500-1799 / bg1_4: 1800+
+  // ===== BG thresholds（1500 / 1800 に調整）=====
   function bgIndexByScore(s) {
     const v = Math.max(0, s);
-    if (v >= 1800) return 3;
-    if (v >= 1500) return 2;
-    if (v >= 300) return 1;
-    return 0;
+    if (v >= 1800) return 3;   // bg1_4
+    if (v >= 1500) return 2;   // bg1_3
+    if (v >= 300)  return 1;   // bg1_2
+    return 0;                  // bg1_1
   }
 
   function currentBgImage() {
@@ -333,7 +329,7 @@
     elPanelTitle.textContent = "あんきらチョコあつめ";
     elPanelText.classList.remove("countdownBig");
     elPanelText.textContent = titleHtml();
-    elPanelHint.textContent = "";
+    elPanelHint.textContent = assetsReady ? "" : "Loading…";
 
     btnExitPanel.style.visibility = "hidden";
     btnStart.textContent = "Start";
@@ -419,12 +415,10 @@
   }
 
   function startPrecount() {
-    // ★assetsReady前は開始しない（確実スタート）
     if (!assetsReady) {
       showLoading();
       return;
     }
-
     state = "precount";
     resetRun();
 
@@ -460,7 +454,6 @@
     player.x = laneX(player.lane);
   }
 
-  // ★EnterもassetsReady前は無効（確実スタート）
   window.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft") { e.preventDefault(); move(-1); }
     if (e.key === "ArrowRight") { e.preventDefault(); move(1); }
@@ -471,7 +464,6 @@
     }
   }, { passive: false });
 
-  // Buttons（★assetsReady前は開始しない）
   btnStart.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     if (!assetsReady) { showLoading(); return; }
@@ -587,6 +579,10 @@
   }
 
   // ===== Effects triggers =====
+  let scoreBumpT = 0, scoreScale = 1.0;
+  let timeBumpT = 0, timeScale = 1.0;
+  let scoreYellowT = 0, timeYellowT = 0, timeRedT = 0;
+
   function bumpScoreYellow() {
     scoreBumpT = 0.0001;
     scoreYellowT = SCORE_BUMP_DUR;
@@ -620,7 +616,6 @@
       flashTimeRedOnly();
 
       player.damageHoldT = DAMAGE_HOLD_SEC;
-
       removeAttachedFig1Half();
 
       if (timeLeft <= 0) { timeLeft = 0; endToResultWithZoom(); return; }
@@ -633,7 +628,6 @@
       timeLeft += TIME_FIG3;
 
       attachAroundPlayer("fig3");
-
       bumpTimeYellow();
 
       if (timeLeft <= 0) { timeLeft = 0; endToResultWithZoom(); return; }
@@ -662,6 +656,7 @@
   function hitAttached(o) {
     if (!o) return false;
     for (const a of attached) {
+      if (!a) continue;
       const ax = player.x + a.ox;
       const ay = player.y + a.oy;
       const rr = o.r + a.r;
@@ -669,6 +664,21 @@
       if (dx * dx + dy * dy < rr * rr) return true;
     }
     return false;
+  }
+
+  // ===== Robust cleanup（★undefined混入対策の本体）=====
+  function sweepUndefined() {
+    // たまに混ざる undefined / null を回収してクラッシュを防ぐ
+    if (falling.length) {
+      let dirty = false;
+      for (let i = 0; i < falling.length; i++) { if (!falling[i]) { dirty = true; break; } }
+      if (dirty) falling = falling.filter(Boolean);
+    }
+    if (attached.length) {
+      let dirty = false;
+      for (let i = 0; i < attached.length; i++) { if (!attached[i]) { dirty = true; break; } }
+      if (dirty) attached = attached.filter(Boolean);
+    }
   }
 
   // ===== Update Effects =====
@@ -738,6 +748,7 @@
 
   function drawFalling() {
     for (const o of falling) {
+      if (!o) continue;
       const size = o.r * 2;
 
       if (o.type === "fig1" && images.fig1) { ctx.drawImage(images.fig1, o.x - size/2, o.y - size/2, size, size); continue; }
@@ -755,6 +766,7 @@
 
   function drawAttached() {
     for (const a of attached) {
+      if (!a) continue;
       const ax = player.x + a.ox;
       const ay = player.y + a.oy;
       const size = a.r * 2;
@@ -820,6 +832,9 @@
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
 
+      // ★毎フレーム掃除（undefined混入で落ちるのを防ぐ）
+      sweepUndefined();
+
       if (state === "precount") {
         preTimer += dt;
         if (preTimer >= 1.0) {
@@ -862,6 +877,7 @@
 
         for (let i = falling.length - 1; i >= 0; i--) {
           const o = falling[i];
+          if (!o) { falling.splice(i, 1); continue; } // ★ガード
           o.y += o.vy * dt;
 
           if (hitPlayer(o) || (attached.length > 0 && hitAttached(o))) {
@@ -895,9 +911,7 @@
   }
 
   // ===== Boot =====
-  // ★先にLoadingを出して、プリロード完了後にタイトル表示＆ゲームループ開始
   showLoading();
-
   preloadImages().then(() => {
     assetsReady = true;
     showTitle();
