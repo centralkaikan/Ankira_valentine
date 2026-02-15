@@ -96,8 +96,6 @@
   // ===== DOM =====
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
-
-  // 画像がぼけるのが嫌ならtrueでもOK（今回はドットじゃないのでfalse寄り）
   ctx.imageSmoothingEnabled = true;
 
   const elHudTop = document.getElementById("hudTop");
@@ -254,7 +252,7 @@
 
   let fig3NextEligibleAt = 0;
 
-  // Effects（※二重宣言しない）
+  // Effects
   let scoreBumpT = 0;
   let scoreScale = 1.0;
 
@@ -309,8 +307,11 @@
     if (state === "playing") {
       elControls.classList.remove("hidden");
       elHudTop.classList.remove("hidden");
+
+      // ★見た目は消してもOKだが、入力は殺さない（iPad対策）
       elControls.style.opacity = uiVisible ? "1" : "0";
-      elControls.style.pointerEvents = uiVisible ? "auto" : "none";
+      elControls.style.pointerEvents = "auto"; // ←常に有効にする
+
     } else {
       elControls.classList.add("hidden");
       elControls.style.opacity = "0";
@@ -471,7 +472,6 @@
     let lastFire = 0;
     const fire = (e) => {
       const now = performance.now();
-      // iOSで pointer+click が連続発火することがあるので抑止
       if (now - lastFire < 350) return;
       lastFire = now;
 
@@ -479,11 +479,8 @@
       handler(e);
     };
 
-    // pointer対応ブラウザ
     el.addEventListener("pointerdown", fire, { passive: false });
-    // iOS Safari の保険（古め環境）
     el.addEventListener("touchstart", fire, { passive: false });
-    // click保険（最強）
     el.addEventListener("click", fire, false);
   }
 
@@ -501,7 +498,7 @@
     }
   }
 
-  // ここからボタン登録（※二重登録しない）
+  // ボタン
   bindTap(btnStart, () => {
     if (!assetsReady) { showLoading(); return; }
     if (state === "title" || state === "result") startPrecount();
@@ -515,6 +512,25 @@
   });
   bindTap(btnLeft,  () => move(-1));
   bindTap(btnRight, () => move(1));
+
+  // ★追加：矢印が消えても遊べる「画面左右タップ移動」
+  // iPadで controls が見えなくなっても確実に動く
+  bindTap(canvas, (e) => {
+    if (state !== "playing") return;
+
+    // クリック座標→canvas内座標へ
+    const rect = canvas.getBoundingClientRect();
+    const clientX =
+      (e?.touches && e.touches[0]?.clientX) ? e.touches[0].clientX :
+      (e?.changedTouches && e.changedTouches[0]?.clientX) ? e.changedTouches[0].clientX :
+      (typeof e?.clientX === "number" ? e.clientX : null);
+
+    if (clientX == null) return;
+
+    const x = (clientX - rect.left) / rect.width * W;
+    if (x < W * 0.5) move(-1);
+    else move(1);
+  });
 
   // ===== Spawn =====
   function pickType() {
@@ -680,7 +696,7 @@
     return false;
   }
 
-  // ===== Robust cleanup（undefined混入対策）=====
+  // ===== Robust cleanup =====
   function sweepUndefined() {
     if (falling.length) {
       let dirty = false;
@@ -730,7 +746,6 @@
   function drawTimeBig() {
     const text = Math.max(0, timeLeft).toFixed(1);
 
-    // 赤の時は拡大しない
     const useScale = (timeYellowT > 0) ? timeScale : 1.0;
     const fontPx = Math.round(TIME_FONT_BASE * useScale);
 
