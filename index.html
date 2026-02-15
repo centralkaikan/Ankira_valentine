@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>あんきらチョコあつめ</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+  <!-- ★正方形プレイエリアの親 -->
+  <div id="stage">
+
+    <canvas id="game" width="1080" height="1080"></canvas>
+
+    <div id="hud">
+      <!-- Top HUD (in-game) -->
+      <div id="hudTop" class="hudTop hidden">
+        <button id="btnExitTop" class="btnSmall" type="button">おわる</button>
+        <div id="score" class="score">SCORE: 0000</div>
+      </div>
+
+      <!-- Center Panel (Title / Precount / Result) -->
+      <div id="panel" class="panel">
+        <div id="panelTitle" class="panelTitle">あんきらチョコあつめ</div>
+        <div id="panelText" class="panelText">クリック / Enter でスタート</div>
+
+        <div class="panelBtns">
+          <button id="btnStart" class="btnWide" type="button">Start</button>
+          <button id="btnShare" class="btnWide" type="button">Share</button>
+          <button id="btnExitPanel" class="btnWide" type="button">Xに戻る</button>
+        </div>
+
+        <div id="panelHint" class="panelHint"></div>
+      </div>
+
+      <!-- Mobile controls (表示だけ) -->
+      <div id="controls" class="controls hidden">
+        <button id="btnLeft" class="btn" aria-label="Left">◀</button>
+        <button id="btnRight" class="btn" aria-label="Right">▶</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="./main.js"></script>
+</body>
+</html>
