@@ -1,4 +1,5 @@
-(() => {
+
+() => {
   "use strict";
 
   // ===== Canvas / World =====
@@ -464,11 +465,44 @@
     }
   }, { passive: false });
 
-  btnStart.addEventListener("pointerdown", (e) => {
+  function bindTap(el, handler) {
+  if (!el) return;
+  // pointer対応ブラウザ
+  el.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    if (!assetsReady) { showLoading(); return; }
-    if (state === "title" || state === "result") startPrecount();
+    handler(e);
   }, { passive: false });
+
+  // iPad/Safariフォールバック
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    handler(e);
+  }, false);
+}
+
+// 例：Start
+bindTap(btnStart, () => {
+  if (!assetsReady) { showLoading(); return; }
+  if (state === "title" || state === "result") startPrecount();
+});
+
+// 例：Share
+bindTap(btnShare, () => share());
+
+// 例：もどる
+bindTap(btnExitPanel, () => {
+  if (state === "result") showTitle();
+});
+
+// 例：おわる
+bindTap(btnExitTop, () => {
+  if (state === "playing") endToResultWithZoom();
+});
+
+// 例：左右
+bindTap(btnLeft,  () => move(-1));
+bindTap(btnRight, () => move(1));
+
 
   btnExitPanel.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -921,3 +955,4 @@
     requestAnimationFrame(tick);
   });
 })();
+
