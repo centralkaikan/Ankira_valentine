@@ -1,5 +1,4 @@
-
-() => {
+(() => {
   "use strict";
 
   // ===== Canvas / World =====
@@ -97,6 +96,9 @@
   // ===== DOM =====
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+
+  // 画像がぼけるのが嫌ならtrueでもOK（今回はドットじゃないのでfalse寄り）
+  ctx.imageSmoothingEnabled = true;
 
   const elHudTop = document.getElementById("hudTop");
   const elScore = document.getElementById("score");
@@ -227,7 +229,7 @@
 
   let startMs = 0;
 
-  let player = {
+  const player = {
     lane: 2,
     x: laneX(2),
     y: PLAYER_Y,
@@ -252,7 +254,7 @@
 
   let fig3NextEligibleAt = 0;
 
-  // Effects
+  // Effects（※二重宣言しない）
   let scoreBumpT = 0;
   let scoreScale = 1.0;
 
@@ -271,7 +273,7 @@
     return (performance.now() - startMs) / 1000;
   }
 
-  // ===== BG thresholds（1500 / 1800 に調整）=====
+  // ===== BG thresholds（1500 / 1800）=====
   function bgIndexByScore(s) {
     const v = Math.max(0, s);
     if (v >= 1800) return 3;   // bg1_4
@@ -416,10 +418,7 @@
   }
 
   function startPrecount() {
-    if (!assetsReady) {
-      showLoading();
-      return;
-    }
+    if (!assetsReady) { showLoading(); return; }
     state = "precount";
     resetRun();
 
@@ -465,57 +464,28 @@
     }
   }, { passive: false });
 
+  // ===== Tap binding（iPad確実化：二重発火ガード付き）=====
   function bindTap(el, handler) {
-  if (!el) return;
-  // pointer対応ブラウザ
-  el.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    handler(e);
-  }, { passive: false });
+    if (!el) return;
 
-  // iPad/Safariフォールバック
-  el.addEventListener("click", (e) => {
-    e.preventDefault();
-    handler(e);
-  }, false);
-}
+    let lastFire = 0;
+    const fire = (e) => {
+      const now = performance.now();
+      // iOSで pointer+click が連続発火することがあるので抑止
+      if (now - lastFire < 350) return;
+      lastFire = now;
 
-// 例：Start
-bindTap(btnStart, () => {
-  if (!assetsReady) { showLoading(); return; }
-  if (state === "title" || state === "result") startPrecount();
-});
+      try { e?.preventDefault?.(); } catch {}
+      handler(e);
+    };
 
-// 例：Share
-bindTap(btnShare, () => share());
-
-// 例：もどる
-bindTap(btnExitPanel, () => {
-  if (state === "result") showTitle();
-});
-
-// 例：おわる
-bindTap(btnExitTop, () => {
-  if (state === "playing") endToResultWithZoom();
-});
-
-// 例：左右
-bindTap(btnLeft,  () => move(-1));
-bindTap(btnRight, () => move(1));
-
-
-  btnExitPanel.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    if (state === "result") showTitle();
-  }, { passive: false });
-
-  btnExitTop.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    if (state === "playing") endToResultWithZoom();
-  }, { passive: false });
-
-  btnLeft.addEventListener("pointerdown", (e) => { e.preventDefault(); move(-1); }, { passive: false });
-  btnRight.addEventListener("pointerdown", (e) => { e.preventDefault(); move(1); }, { passive: false });
+    // pointer対応ブラウザ
+    el.addEventListener("pointerdown", fire, { passive: false });
+    // iOS Safari の保険（古め環境）
+    el.addEventListener("touchstart", fire, { passive: false });
+    // click保険（最強）
+    el.addEventListener("click", fire, false);
+  }
 
   function share() {
     const text = `あんきらチョコあつめ 得点:${lastScore} / 総得点:${totalScore}`;
@@ -530,7 +500,21 @@ bindTap(btnRight, () => move(1));
       );
     }
   }
-  btnShare.addEventListener("pointerdown", (e) => { e.preventDefault(); share(); }, { passive: false });
+
+  // ここからボタン登録（※二重登録しない）
+  bindTap(btnStart, () => {
+    if (!assetsReady) { showLoading(); return; }
+    if (state === "title" || state === "result") startPrecount();
+  });
+  bindTap(btnShare, () => share());
+  bindTap(btnExitPanel, () => {
+    if (state === "result") showTitle();
+  });
+  bindTap(btnExitTop, () => {
+    if (state === "playing") endToResultWithZoom();
+  });
+  bindTap(btnLeft,  () => move(-1));
+  bindTap(btnRight, () => move(1));
 
   // ===== Spawn =====
   function pickType() {
@@ -613,10 +597,6 @@ bindTap(btnRight, () => move(1));
   }
 
   // ===== Effects triggers =====
-  let scoreBumpT = 0, scoreScale = 1.0;
-  let timeBumpT = 0, timeScale = 1.0;
-  let scoreYellowT = 0, timeYellowT = 0, timeRedT = 0;
-
   function bumpScoreYellow() {
     scoreBumpT = 0.0001;
     scoreYellowT = SCORE_BUMP_DUR;
@@ -646,8 +626,8 @@ bindTap(btnRight, () => move(1));
       score += SCORE_FIG2;
       timeLeft += TIME_FIG2;
 
-      bumpScoreYellow();
-      flashTimeRedOnly();
+      bumpScoreYellow();     // スコア：黄色ボヨン（最大1.5）
+      flashTimeRedOnly();    // 時間：赤1秒（拡大なし）
 
       player.damageHoldT = DAMAGE_HOLD_SEC;
       removeAttachedFig1Half();
@@ -662,7 +642,7 @@ bindTap(btnRight, () => move(1));
       timeLeft += TIME_FIG3;
 
       attachAroundPlayer("fig3");
-      bumpTimeYellow();
+      bumpTimeYellow();      // 時間：黄色ボヨン（最大3.0）
 
       if (timeLeft <= 0) { timeLeft = 0; endToResultWithZoom(); return; }
       updateHUD(true);
@@ -700,9 +680,8 @@ bindTap(btnRight, () => move(1));
     return false;
   }
 
-  // ===== Robust cleanup（★undefined混入対策の本体）=====
+  // ===== Robust cleanup（undefined混入対策）=====
   function sweepUndefined() {
-    // たまに混ざる undefined / null を回収してクラッシュを防ぐ
     if (falling.length) {
       let dirty = false;
       for (let i = 0; i < falling.length; i++) { if (!falling[i]) { dirty = true; break; } }
@@ -866,7 +845,6 @@ bindTap(btnRight, () => move(1));
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
 
-      // ★毎フレーム掃除（undefined混入で落ちるのを防ぐ）
       sweepUndefined();
 
       if (state === "precount") {
@@ -911,7 +889,7 @@ bindTap(btnRight, () => move(1));
 
         for (let i = falling.length - 1; i >= 0; i--) {
           const o = falling[i];
-          if (!o) { falling.splice(i, 1); continue; } // ★ガード
+          if (!o) { falling.splice(i, 1); continue; }
           o.y += o.vy * dt;
 
           if (hitPlayer(o) || (attached.length > 0 && hitAttached(o))) {
@@ -955,4 +933,3 @@ bindTap(btnRight, () => move(1));
     requestAnimationFrame(tick);
   });
 })();
-
